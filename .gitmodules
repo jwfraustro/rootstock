@@ -1,0 +1,6 @@
+[submodule "gh-corelib"]
+	path = gh-corelib
+	url = https://github.com/jwfraustro/gh-corelib
+[submodule "scion"]
+	path = scion
+	url = https://github.com/jwfraustro/scion
