@@ -13,11 +13,7 @@ Rootstock automates:
 
 Where Scion creates the *branches* of the tree, Rootstock creates the *roots*.
 
-## What's Rootstock?
-In horticulture, a [rootstock](https://en.wikipedia.org/wiki/Rootstock) is the part of a plant onto which new cuttings are grafted.
-
-In the Arborist Suite, Rootstock is responsible for creating the hub that later reverse-shells will be grafted onto. After the initial deployment of the Rootstock hub, Rootstock can then leverage Scion to mass-deploy reverse-shell grafts to other target hosts.
-
+## Architecture Diagram
 ```
 Scion    Scion    Scion   Scion <--- RShells
     \    /          \     /
@@ -30,7 +26,13 @@ Scion    Scion    Scion   Scion <--- RShells
            ../|:|\.-.
 ```
 
-Only the initial connection to the Rootstock hub is visible, as the Rootstock hub then creates an rshell back home to your machine. From that point forward, all connections through Rootstock hub(s) become invisible.
+## What's Rootstock?
+In horticulture, a [rootstock](https://en.wikipedia.org/wiki/Rootstock) is the part of a plant onto which new cuttings are grafted.
+
+In the Arborist Suite, Rootstock is responsible for creating the hub that later reverse-shells will be grafted onto. After the initial deployment of the Rootstock hub, Rootstock can then leverage Scion to mass-deploy reverse-shell grafts to other target hosts.
+
+
+Only the initial connection to the Rootstock hub is visible, as the Rootstock hub then creates an rshell back home to your machine. From that point forward, all connections through Rootstock hub(s) become invisible to network monitoring.
 
 ## Installation
 It is highly recommended that you clone this repository and use the [Greybel](https://github.com/ayecue/greybel-js) CLI tool or the [Greybel VSCode extension](https://github.com/ayecue/greybel-vs) to build the Rootstock source and import it into Grey Hack.
@@ -38,13 +40,26 @@ It is highly recommended that you clone this repository and use the [Greybel](ht
 The [gh-corelib](https://github.com/jwfraustro/gh-corelib), [scion](https://github.com/jwfraustro/scion), and [chainsaw](https://github.com/jwfraustro/chainsaw) libraries are provided as git submodules. Be sure to clone the repository with the `--recurse-submodules` flag to ensure that these dependencies are included.
 
 ```
-git clone --recurse-submodules
+git clone --recurse-submodules http://github.com/jwfraustro/rootstock
 ```
 
 I really don't suggest downloading or copying the source code manually, as it may lead to headaches when it comes to sorting out dependencies.
 
 ## Usage
-Rootstock is designed to be controlled by another script and **does not run from the commandline**.
+Rootstock is designed to be controlled by another script and **does not run from the command line**. A very basic example:
+```
+import_code("rootstock.src")
+
+rootstock = new Rootstock
+rootstock.hub_ip = "123.44.12.7"
+rootstock.ip_group = ["10.0.0.5", "10.0.0.6"]
+
+rootstock.DeployHub()
+rootstock.DeployGrafts()
+
+print("Connected grafts:")
+rootstock.CheckGrafts()
+```
 
 To deploy a Rootstock hub, you must import the 'rootstock.src' module into your Grey Hack script. At minimum you will need to instantiate a `Rootstock` object and either run the `init()` method to interactively set up the Rootstock object, or manually set the target hub's IP address before calling the `DeployHub()` method.
 
@@ -77,12 +92,12 @@ rootstock.CheckGrafts() // print status of grafts
 ## Details
 ### Deployment
 
-Rootstock uses SSH to connect to the target host and deploy the Rootstock hub. If the password to the target host is not known, Rootstock will automatically attempt to exploit any vulnerabilities found on the target host, and aquire root credentials using [chainsaw](https://github.com/jwfraustro/chainsaw).
+Rootstock uses SSH to connect to the target host and deploy the Rootstock hub. If the password to the target host is not known, Rootstock will automatically attempt to exploit any vulnerabilities found on the target host, and acquire root credentials using [chainsaw](https://github.com/jwfraustro/chainsaw).
 
 Once connected, Rootstock will attempt to copy `aptclient.so` and `metaxploit.so` system libraries to the target host. If it succeeds, it will deploy an RCE script to set up an rshell server on the target host as well as a script to fetch all connected graft shells.
 
 ### Grafting
-After the Rootstock hub is deployed, Rootstock can then attempt to deploy reverse-shell grafts to other target hosts using Scion to automatically self-elevate and setup rshell clients. Alternatively, if you prefer or need to manually set up grafts, you can simply point any rshell client to connect back to the Rootstock hub.
+After the Rootstock hub is deployed, Rootstock can then attempt to deploy reverse-shell grafts to other target hosts using Scion to automatically self-elevate and set up rshell clients. Alternatively, if you prefer or need to manually set up grafts, you can simply point any rshell client to connect back to the Rootstock hub.
 
 ### Checking Grafts
 Rootstock provides a `CheckGrafts()` method that will simply print the status of all grafts connected to the Rootstock hub through an RCE script.
@@ -96,7 +111,7 @@ Because rshell connections (at the time of this script's creation) are not autom
 Rootstock is a fairly complex concept to grasp, and its power is best demonstrated when used in conjunction with the Arborist tool.
 
 ## Support Notice
-Scion is provided as-is. I no longer actively maintain Grey Hack related projects or play the game. I cannot guarantee that Scion will work with future versions of Grey Hack. This project is simply provided as a reference for those interested.
+Rootstock is provided as-is. I no longer play Grey Hack, and future maintenance is unlikely. I cannot guarantee that Rootstock will work with future versions of Grey Hack. This project is simply provided as a reference for those interested.
 
 Fun fact: Scion, Rootstock, and Arborist were used to create a network of over 7000 rshell connections in the creation of my (now defunct) GreyHack Network Map project.
 
