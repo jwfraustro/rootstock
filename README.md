@@ -11,7 +11,7 @@ Rootstock automates:
 - Creating an rshell back home to your machine
 - Returning all connected shells to calling scripts for management
 
-Where Scion creates the *branches* of the tree, Rootstock creates the *roots*.
+Where Scion creates the *grafts* of the tree, Rootstock creates the *branches*.
 
 ## Architecture Diagram
 ```
@@ -31,8 +31,7 @@ In horticulture, a [rootstock](https://en.wikipedia.org/wiki/Rootstock) is the p
 
 In the Arborist Suite, Rootstock is responsible for creating the hub that later reverse-shells will be grafted onto. After the initial deployment of the Rootstock hub, Rootstock can then leverage Scion to mass-deploy reverse-shell grafts to other target hosts.
 
-
-Only the initial connection to the Rootstock hub is visible, as the Rootstock hub then creates an rshell back home to your machine. From that point forward, all connections through Rootstock hub(s) become invisible to network monitoring.
+Only your connection to the Rootstock hub is visible to network monitoring; all grafted reverse-shells connect back to the Rootstock hub, which in turn connects back to you. If the Roostock hub becomes compromised you can perform lift-and-shift operations to move all grafts to a new Rootstock hub using the Arborist tool.
 
 ## Installation
 It is highly recommended that you clone this repository and use the [Greybel](https://github.com/ayecue/greybel-js) CLI tool or the [Greybel VSCode extension](https://github.com/ayecue/greybel-vs) to build the Rootstock source and import it into Grey Hack.
@@ -70,7 +69,7 @@ rootstock = new Rootstock
 rootstock.init() // to set up interactively
 // or
 rootstock.hub_ip = "1.2.3.4" // the target address for the Rootstock hub
-// rootstock.hub_password = "password" // if the password to the target host's ssh is known
+// rootstock.hub_password = "password" // if the password to the target host's SSH is known
 rootstock.DeployHub()
 ```
 
@@ -105,7 +104,7 @@ Rootstock provides a `CheckGrafts()` method that will simply print the status of
 ### Fetching Shells
 Because rshell connections (at the time of this script's creation) are not automatically able to be passed back to the calling script through multiple connections, Rootstock creates a `get_grafts` executable on the hub host sets the graft shells into the `get_custom_object.shells` property. The calling script can then access the connected graft shells through this property. Additionally, it means that the calling script never has to directly connect to the grafts themselves, as all commands can be routed through the Rootstock hub.
 
- For an example of how this works in practice, check the `arborist/branch.src` file in the Arborist Suite repository.
+For an example of how this works in practice, check the `branch.src` file in the Arborist Suite repository.
 
 ### On Complexity
 Rootstock is a fairly complex concept to grasp, and its power is best demonstrated when used in conjunction with the Arborist tool.
