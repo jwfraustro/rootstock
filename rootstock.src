@@ -124,8 +124,6 @@ RootStock.DeployHub = function // Setup RootStock on the hub
 		return false
 	end if
 
-	result = RootStock.home_shell.scp("home/nitrocynic/kill", "/bin/", hub_shell)
-
 	Scion.rshell_ip = RootStock.home_ip
 	Scion.rshell_port = RootStock.home_port
 
@@ -153,7 +151,7 @@ RootStock.DeployHub = function // Setup RootStock on the hub
 		RootStock.hub_password = get_custom_object.chainsaw.password
 	end if
 
-    // This createes an RCE script that will return a custom object containing shells of all the
+    // This creates an RCE script that will return a custom object containing shells of all the
     // grafts connected to the Rootstock hub. Arborist uses these to perform mass operations.
 	fetch_grafts_rce = "
 	metax = include_lib(""/lib/metaxploit.so"")
