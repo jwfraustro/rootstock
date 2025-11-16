@@ -1,0 +1,242 @@
+// RootStock
+// RShell Hub Deployment - Part of the Arborist suite
+// by NitroCynic
+
+get_custom_object.in_script = true
+
+import_code("gh-corelib/Modules.src")
+import_code("scion/scion.src")
+
+RootStock = {}
+RootStock.version = "1.0.0"
+RootStock.ip_group = []
+
+RootStock.hub_ip = "" // where a Rootstock instance will be deployed
+RootStock.hub_password = "" // the password for the SSH service running on the target machine
+RootStock.home_ip = "" // the home IP the rootstock hub will create an rshell to
+RootStock.home_port = 1222 // the rshell port
+RootStock.process_name = "rootstock"
+
+RootStock.remote_shell = null
+RootStock.hub_shell = null
+RootStock.home_shell = null
+
+RootStock.apt_client = null
+RootStock.rhsell_lib = null
+
+RootStock.results = {}
+RootStock.results.hub = {}
+RootStock.results.grafts = []
+
+RootStock.init = function // Initialize RootStock
+
+	RootStock.home_shell = get_shell
+
+	metax = Modules.FindALib("metaxploit.so")
+	apt_client = Modules.FindALib("aptclient.so")
+	rhsell_lib = Modules.FindALib("librshell.so")
+	shell_lib = Modules.FindALib("libssh.so")
+
+	print(apt_client.path)
+	print(rhsell_lib.path)
+	print(shell_lib.path)
+	print(metax.path)
+
+	if not apt_client or not rhsell_lib or not shell_lib then
+		print("Error: Required libraries not found.")
+		return false
+	end if
+
+	RootStock.apt_client = apt_client
+	RootStock.rhsell_lib = rhsell_lib
+	RootStock.shell_lib = shell_lib
+	RootStock.metax = metax
+
+	default_home_ip = RootStock.home_shell.host_computer.public_ip
+	home_ip_input = user_input("Enter home IP address (default: " + default_home_ip + "): ")
+	if home_ip_input != "" then
+		RootStock.home_ip = home_ip_input
+		home_port_input = user_input("Enter home port (default: " + RootStock.home_port + "): ")
+		if home_port_input != "" then
+			RootStock.home_port = home_port_input
+		end if
+	else
+		RootStock.home_ip = default_home_ip
+	end if
+
+	if not RootStock.hub_ip then
+		hub_ip_input = user_input("Enter IP to deploy hub to: ")
+		if hub_ip_input != "" then
+			RootStock.hub_ip = hub_ip_input
+		else
+			print("Error: No IP address provided.")
+			return false
+		end if
+	end if
+
+	if not RootStock.hub_password then
+		hub_password_input = user_input("Enter password for hub: ")
+		if hub_password_input != "" then
+			RootStock.hub_password = hub_password_input
+		end if
+	end if
+
+end function
+
+RootStock.DeployHub = function // Setup RootStock on the hub
+
+	section_str = "
+    ------------------------------------
+    Deploying Hub on " + RootStock.hub_ip + "
+    ------------------------------------
+    "
+	print(section_str)
+
+	if RootStock.hub_password then
+		RootStock.hub_shell = RootStock.home_shell.connect_service(
+			RootStock.hub_ip,
+			22,
+			"root",
+			RootStock.hub_password)
+	else
+		RootStock.hub_shell = Modules.GetAShell(RootStock.hub_ip)
+	end if
+
+	if not RootStock.hub_shell then
+		print("Error: Could not get shell on hub.")
+		return false
+	end if
+
+	// Setup the hub - deploy the libraries
+	hub_shell = RootStock.hub_shell
+
+	result = RootStock.home_shell.scp(RootStock.apt_client.path, "/lib/", hub_shell)
+	if typeof(result) == "string" then
+		print("Error: Could not copy aptclient library to hub.")
+		print(result)
+		return false
+	end if
+
+	result = RootStock.home_shell.scp(RootStock.metax.path, "/lib/", hub_shell)
+	if typeof(result) == "string" then
+		print("Error: Could not copy metaxploit library to hub.")
+		print(result)
+		return false
+	end if
+
+	result = RootStock.home_shell.scp("home/nitrocynic/kill", "/bin/", hub_shell)
+
+	Scion.rshell_ip = RootStock.home_ip
+	Scion.rshell_port = RootStock.home_port
+
+    // This RCE sets up the required libraries on the hub
+    // If this hard-coded hackshop IP no longer works, you'll need to change it
+	rce_str = "
+    apt_client = include_lib(""/lib/aptclient.so"")
+    apt_client.add_repo(""30.225.197.154"")
+    apt_client.update
+    apt_client.install(""libssh.so"")
+    apt_client.install(""librshell.so"")
+    apt_client.install(""rshell-server"")
+    apt_client.install(""rshell_interface"")
+    ssh_service = include_lib(""/lib/libssh.so"")
+    print(ssh_service)
+    ssh_service.install_service
+    rshell_service = include_lib(""/lib/librshell.so"")
+    rshell_service.install_service
+    "
+
+	Modules.RCE(hub_shell, rce_str, "/home/guest")
+
+	if get_custom_object.hasIndex("chainsaw") then
+		// We got root from chainsaw
+		RootStock.hub_password = get_custom_object.chainsaw.password
+	end if
+
+    // This createes an RCE script that will return a custom object containing shells of all the
+    // grafts connected to the Rootstock hub. Arborist uses these to perform mass operations.
+	fetch_grafts_rce = "
+	metax = include_lib(""/lib/metaxploit.so"")
+	shells = metax.rshell_server
+	get_custom_object.shells = shells
+	"
+
+	rce_source = RootStock.hub_shell.host_computer.touch("/home/guest", "get_grafts.src")
+	rce_source = RootStock.hub_shell.host_computer.File("/home/guest/get_grafts.src")
+
+	rce_source.set_content(fetch_grafts_rce)
+	build_result = RootStock.hub_shell.build("/home/guest/get_grafts.src", "/bin")
+	rce_source.set_content("")
+	print(build_result)
+
+end function
+
+RootStock.DeployGrafts = function // Deploy the grafts to the hub
+
+	section_str = "
+    ------------------------------------
+    Deploying Grafts on " + len(RootStock.ip_group) + " machines
+    ------------------------------------
+    "
+	print(section_str)
+
+
+	if not RootStock.hub_shell then
+		print("Error: No hub shell available.")
+		return false
+	end if
+
+	for ip in RootStock.ip_group
+
+		get_custom_object.get_a_shell = @Modules.GetAShell(ip)
+		get_custom_object.remove("remote_shell")
+
+		// setup apt client on the grafted machine
+		rce = "
+        remote_shell = get_custom_object.get_a_shell
+        if not remote_shell then
+            print(""Could not get a shell"")
+            exit
+        end if
+        print(""Connection on: "" + remote_shell.host_computer.public_ip)
+        get_shell.scp(""/lib/aptclient.so"", ""/lib/"", remote_shell)
+        get_custom_object.remote_shell = remote_shell
+        "
+
+		Modules.RCE(RootStock.hub_shell, rce, "/home/guest")
+
+		if not get_custom_object.hasIndex("remote_shell") then
+			print("Error: Could not get shell on " + ip + ".")
+			continue
+		end if
+
+		if get_custom_object.remote_shell == null then
+			print("Error: Could not get shell on " + ip + ".")
+			continue
+		end if
+
+		print("Output of RCE: " + get_custom_object.remote_shell.host_computer.public_ip)
+
+		// setup scion on the grafted machine
+		Scion.rshell_ip = RootStock.hub_ip
+		Scion.init(get_custom_object.remote_shell)
+		Scion.graft
+
+	end for
+
+end function
+
+RootStock.CheckGrafts = function // Check the grafts to see which were successful
+
+	rce = "
+    metax = include_lib(""/lib/metaxploit.so"")
+    shells = metax.rshell_server
+    print(shells)
+    for shell in shells
+        print(""Graft: "" +shell.host_computer.public_ip)
+    end for
+    "
+
+	result = Modules.RCE(RootStock.hub_shell, rce, "/home/guest")
+
+end function
